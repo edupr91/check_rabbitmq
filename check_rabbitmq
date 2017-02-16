@@ -230,6 +230,7 @@ if __name__ == "__main__":
     elif options.action == "aliveness":
         if options.virtualhost is None:
             print "virtual host is required (-v|--vhost <vhost>)"
+            exit(1)
         check_aliveness(options.username, options.password, options.timeout, options.cluster, options.virtualhost)
     elif options.action == "cluster_status":
         check_cluster(options.username, options.password, options.timeout, options.cluster)
