@@ -32,11 +32,13 @@ class RabbitCmdWrapper(object):
         return results, r
 
     @classmethod
-    def status(cls, username, password, cluster, virtualhost, timeout):
-        args = shlex.split('sudo rabbitmqctl status')
-        cmd_result = subprocess.check_output(args).strip()
-        results = cls._parse_list_results(cmd_result)
-        return results
+    def status(cls, username, password, cluster, nodename, timeout):
+        r = requests.get("http://%s:15672/api/nodes/rabbit@%s" % (cluster, nodename), auth=(username, password), timeout=timeout)
+        results = json.loads("%s" % r.text)
+        #args = shlex.split('sudo rabbitmqctl status')
+        #cmd_result = subprocess.check_output(args).strip()
+        #results = cls._parse_list_results(cmd_result)
+        return results, r
 
     @classmethod
     def _parse_list_results(cls, result_string):
@@ -95,37 +97,43 @@ def check_queues_count(username, password, cluster, virtualhost, timeout, critic
             print "CRITICAL - RabbitMQ Error: %s" % raw_request.content
             sys.exit(2)
         else:
-            print "UNKNOWN - RABBITMQ Aliveness Test"
+            print "UNKNOWN - RABBITMQ queues status"
             sys.ext(1)
             print 'check_queues_count -- %s'  % results
     except Exception, err:
         print "CRITICAL - %s" % err
         sys.exit(2)
 
-def check_mem_usage(critical, warning):
+def check_mem_usage(username, password, cluster, nodename, timeout, critical, warning):
+
     """Check to make sure the RAM usage of rabbitmq process does not exceed 50%% of its max"""
     try:
-        results = RabbitCmdWrapper.status()
-
-        for idx,val in enumerate(results):
-          if "memory," in str(val):
-              mem_used_raw = str(results[idx + 1])
-          if "vm_memory_limit" in str(val):
-              mem_limit_raw = str(val)
-
-        memory_used = float(filter(str.isdigit, mem_used_raw))
-        memory_limit = float(filter(str.isdigit, mem_limit_raw))
-        percent_usage = int(memory_used/memory_limit * 100)
-
-        if percent_usage > critical:
-            print "CRITICAL - RABBITMQ RAM USAGE at %s%% of max" % percent_usage
+        results, raw_request = RabbitCmdWrapper.status(username, password, cluster, nodename, timeout)
+        if raw_request.status_code == 200:
+            #for idx,val in enumerate(results):
+            #  if "memory," in str(val):
+            #      mem_used_raw = str(results[idx + 1])
+            #  if "vm_memory_limit" in str(val):
+            #      mem_limit_raw = str(val)
+            memory_used = results['mem_used']
+            memory_limit = results['mem_limit']
+            percent_usage = int( ( memory_used * 100 )/memory_limit)
+            if percent_usage > critical:
+                print "CRITICAL - RABBITMQ RAM USAGE at %s%% of max" % percent_usage
+                sys.exit(2)
+            elif percent_usage > warning:
+                print "WARNING - RABBITMQ RAM USAGE at %s%% of max" % percent_usage
+                sys.exit(1)
+            else:
+                print "OK - RABBITMQ RAM USAGE OK at %s%% of max" % percent_usage
+                sys.exit(0)
+        elif raw_request.status_code != 200:
+            print "CRITICAL - RabbitMQ Error: %s" % raw_request.content
             sys.exit(2)
-        elif percent_usage > warning:
-            print "WARNING - RABBITMQ RAM USAGE at %s%% of max" % percent_usage
-            sys.exit(1)
         else:
-            print "OK - RABBITMQ RAM USAGE OK at %s%% of max" % percent_usage
-            sys.exit(0)
+            print "UNKNOWN - RABBITMQ memory usage status"
+            sys.ext(1)
+            print 'check_queues_count -- %s'  % results
     except Exception, err:
         print "Critical - %s" % err
         sys.exit(2)
@@ -207,6 +215,8 @@ if __name__ == "__main__":
                       type="string", help="Cluster IP/DNS name, defaults to localhost")
     parser.add_option("-v", "--vhost", dest="virtualhost",
                       type="string", help="Virtual host to check")
+    parser.add_option("-n", "--nodename", dest="nodename",
+                      type="string", help="RabbitMQ node name")
     (options, args) = parser.parse_args()
 
     if options.action == "connection_count":
@@ -233,6 +243,9 @@ if __name__ == "__main__":
             exit(1)
         check_queues_count(options.username, options.password, options.cluster, options.virtualhost, options.timeout, critical_value, warning_value)
     elif options.action == "mem_usage":
+        if options.nodename is None:
+            print "Node Name is required (-n|--nodename <Node name>)"
+            exit(1)
         if options.critical is None:
             critical_value = 75
         else:
@@ -241,7 +254,7 @@ if __name__ == "__main__":
             warning_value = 50
         else:
             warning_value = options.warning
-        check_mem_usage(critical_value, warning_value)
+        check_mem_usage(options.username, options.password, options.cluster, options.nodename, options.timeout, critical_value, warning_value)
     elif options.action == "aliveness":
         if options.virtualhost is None:
             print "virtual host is required (-v|--vhost <vhost>)"
