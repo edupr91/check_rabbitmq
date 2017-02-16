@@ -46,7 +46,7 @@ class RabbitCmdWrapper(object):
         return return_data
 
 
-def check_connection_count(critical=0, warning=0):
+def check_connection_count(critical, warning):
     """Checks to make sure the numbers of connections are within parameters."""
     try:
         count = len(RabbitCmdWrapper.list_connections())
@@ -62,7 +62,7 @@ def check_connection_count(critical=0, warning=0):
         print "CRITICAL - %s" % err
 
 
-def check_queues_count(critical=1000, warning=1000):
+def check_queues_count(critical, warning):
     """
     A blanket check to make sure all queues are within count parameters.
     TODO: Possibly break this out so test can be done on individual queues.
@@ -90,7 +90,7 @@ def check_queues_count(critical=1000, warning=1000):
         print "CRITICAL - %s" % err
         sys.exit(2)
 
-def check_mem_usage(critical=75, warning=50):
+def check_mem_usage(critical, warning):
     """Check to make sure the RAM usage of rabbitmq process does not exceed 50%% of its max"""
     try:
         results = RabbitCmdWrapper.status()
@@ -198,11 +198,35 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if options.action == "connection_count":
-        check_connection_count(options.critical, options.warning)
+        if options.critical is None:
+            critical_value = 0
+        else:
+            critical_value = options.critical
+        if options.warning is None:
+            warning_value = 0
+        else:
+            warning_value = options.warning
+        check_connection_count(critical_value, warning_value)
     elif options.action == "queues_count":
-        check_queues_count(options.critical, options.warning)
+        if options.critical is None:
+            critical_value = 1000
+        else:
+            critical_value = options.critical
+        if options.warning is None:
+            warning_value = 1000
+        else:
+            warning_value = options.warning
+        check_queues_count(critical_value, warning_value)
     elif options.action == "mem_usage":
-        check_mem_usage(options.critical, options.warning)
+        if options.critical is None:
+            critical_value = 75
+        else:
+            critical_value = options.critical
+        if options.warning is None:
+            warning_value = 50
+        else:
+            warning_value = options.warning
+        check_mem_usage(critical_value, warning_value)
     elif options.action == "aliveness":
         if options.virtualhost is None:
             print "virtual host is required (-v|--vhost <vhost>)"
