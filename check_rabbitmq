@@ -16,21 +16,23 @@ class RabbitCmdWrapper(object):
     @classmethod
     def list_connections(cls, username, password, cluster, timeout):
         r = requests.get("http://%s:15672/api/connections" % cluster , auth=(username, password), timeout=timeout)
-        result = json.loads("%s" % r.text)
+        results = json.loads("%s" % r.text)
         #args = shlex.split("sudo rabbitmqctl list_connections")
         #cmd_result = subprocess.check_output(args).strip()
         #results = cls._parse_list_results(cmd_result)
-        return result
-
-    @classmethod
-    def list_queues(cls):
-        args = shlex.split('sudo rabbitmqctl list_queues')
-        cmd_result = subprocess.check_output(args).strip()
-        results = cls._parse_list_results(cmd_result)
         return results
 
     @classmethod
-    def status(cls):
+    def list_queues(cls, username, password, cluster, virtualhost, timeout):
+        r = requests.get("http://%s:15672/api/queues/%s" % (cluster, virtualhost), auth=(username, password), timeout=timeout)
+        results = json.loads("%s" % r.text)
+        #args = shlex.split('sudo rabbitmqctl list_queues')
+        #cmd_result = subprocess.check_output(args).strip()
+        #results = cls._parse_list_results(cmd_result)
+        return results, r
+
+    @classmethod
+    def status(cls, username, password, cluster, virtualhost, timeout):
         args = shlex.split('sudo rabbitmqctl status')
         cmd_result = subprocess.check_output(args).strip()
         results = cls._parse_list_results(cmd_result)
@@ -64,7 +66,7 @@ def check_connection_count(username, password, cluster, timeout, critical, warni
         print "CRITICAL - %s" % err
 
 
-def check_queues_count(critical, warning):
+def check_queues_count(username, password, cluster, virtualhost, timeout, critical, warning):
     """
     A blanket check to make sure all queues are within count parameters.
     TODO: Possibly break this out so test can be done on individual queues.
@@ -72,22 +74,30 @@ def check_queues_count(critical, warning):
     try:
         critical_q = []
         warning_q = []
-        results = RabbitCmdWrapper.list_queues()
-        for queue in results:
-            count = int(queue[1])
-            if count >= critical:
-                critical_q.append("%s: %s" % (queue[0], count))
-            elif count >= warning:
-                warning_q.append("%s: %s" % (queue[0], count))
-        if critical_q:
-            print "CRITICAL - %s" % ", ".join(critical_q)
+        results, raw_request = RabbitCmdWrapper.list_queues(username, password, cluster, virtualhost, timeout)
+        if raw_request.status_code == 200:
+            for queue in results:
+                count = int(queue['messages'])
+                if count >= critical:
+                    critical_q.append("%s: %s" % (queue[0], count))
+                elif count >= warning:
+                    warning_q.append("%s: %s" % (queue[0], count))
+            if critical_q:
+                print "CRITICAL - %s" % ", ".join(critical_q)
+                sys.exit(2)
+            elif warning_q:
+                print "WARNING - %s" % ", ".join(warning_q)
+                sys.exit(1)
+            else:
+                print "OK - NO QUEUES EXCEED THRESHOLDS"
+                sys.exit(0)
+        elif raw_request.status_code != 200:
+            print "CRITICAL - RabbitMQ Error: %s" % raw_request.content
             sys.exit(2)
-        elif warning_q:
-            print "WARNING - %s" % ", ".join(warning_q)
-            sys.exit(1)
         else:
-            print "OK - NO QUEUES EXCEED THRESHOLDS"
-            sys.exit(0)
+            print "UNKNOWN - RABBITMQ Aliveness Test"
+            sys.ext(1)
+            print 'check_queues_count -- %s'  % results
     except Exception, err:
         print "CRITICAL - %s" % err
         sys.exit(2)
@@ -218,7 +228,10 @@ if __name__ == "__main__":
             warning_value = 1000
         else:
             warning_value = options.warning
-        check_queues_count(critical_value, warning_value)
+        if options.virtualhost is None:
+            print "virtual host is required (-v|--vhost <vhost>)"
+            exit(1)
+        check_queues_count(options.username, options.password, options.cluster, options.virtualhost, options.timeout, critical_value, warning_value)
     elif options.action == "mem_usage":
         if options.critical is None:
             critical_value = 75
