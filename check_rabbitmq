@@ -14,11 +14,13 @@ class RabbitCmdWrapper(object):
        if desired."""
 
     @classmethod
-    def list_connections(cls):
-        args = shlex.split("sudo rabbitmqctl list_connections")
-        cmd_result = subprocess.check_output(args).strip()
-        results = cls._parse_list_results(cmd_result)
-        return results
+    def list_connections(cls, username, password, cluster, timeout):
+        r = requests.get("http://%s:15672/api/connections" % cluster , auth=(username, password), timeout=timeout)
+        result = json.loads("%s" % r.text)
+        #args = shlex.split("sudo rabbitmqctl list_connections")
+        #cmd_result = subprocess.check_output(args).strip()
+        #results = cls._parse_list_results(cmd_result)
+        return result
 
     @classmethod
     def list_queues(cls):
@@ -46,10 +48,10 @@ class RabbitCmdWrapper(object):
         return return_data
 
 
-def check_connection_count(critical, warning):
+def check_connection_count(username, password, cluster, timeout, critical, warning):
     """Checks to make sure the numbers of connections are within parameters."""
     try:
-        count = len(RabbitCmdWrapper.list_connections())
+        count = len(RabbitCmdWrapper.list_connections(username, password, cluster, timeout))
         if count >= critical:
             print "CRITICAL - Connection Count %d" % count
             sys.exit(2)
@@ -206,7 +208,7 @@ if __name__ == "__main__":
             warning_value = 0
         else:
             warning_value = options.warning
-        check_connection_count(critical_value, warning_value)
+        check_connection_count(options.username, options.password, options.cluster, options.timeout, critical_value, warning_value)
     elif options.action == "queues_count":
         if options.critical is None:
             critical_value = 1000
