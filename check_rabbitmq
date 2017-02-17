@@ -189,11 +189,11 @@ USAGE = """Usage: ./check_rabbitmq -a [action] -C [critical] -W [warning]
            - connection_count
              checks the number of connection in rabbitmq's list_connections
            - queues_count
-             checks the count in each of the queues in rabbitmq's list_queues
+             checks the count in each of the queues in rabbitmq's list_queues. (requires -u username -p password -v virtualhost)
            - mem_usage
-             checks to ensure mem usage of rabbitmq process does not exceed 50%
+             checks to ensure mem usage of rabbitmq process does not exceed 50% by default. (requires -u username -p password -n nodename)
            - aliveness
-             Use the /api/aliveness-test API to send/receive a message. (requires -u username -p password args)
+             Use the /api/aliveness-test API to send/receive a message. (requires -u username -p password)
            - cluster_status
              Parse /api/nodes to check the cluster status. (requires -u username -p password"""
 
