@@ -65,7 +65,8 @@ def check_connection_count(username, password, cluster, timeout, critical, warni
         else:
             print "OK - Connection Count %d" % count
     except Exception, err:
-        print "CRITICAL - %s" % err
+        print "CRITICAL - Script error. Please debug - %s" % err
+        sys.exit(2)
 
 
 def check_queues_count(username, password, cluster, virtualhost, timeout, critical, warning):
@@ -81,9 +82,9 @@ def check_queues_count(username, password, cluster, virtualhost, timeout, critic
             for queue in results:
                 count = int(queue['messages'])
                 if count >= critical:
-                    critical_q.append("%s: %s" % (queue[0], count))
+                    critical_q.append("%s: %s" % (queue['name'], count))
                 elif count >= warning:
-                    warning_q.append("%s: %s" % (queue[0], count))
+                    warning_q.append("%s: %s" % (queue['name'], count))
             if critical_q:
                 print "CRITICAL - %s" % ", ".join(critical_q)
                 sys.exit(2)
@@ -101,7 +102,7 @@ def check_queues_count(username, password, cluster, virtualhost, timeout, critic
             sys.ext(1)
             print 'check_queues_count -- %s'  % results
     except Exception, err:
-        print "CRITICAL - %s" % err
+        print "CRITICAL - Script error. Please debug - %s" % err
         sys.exit(2)
 
 def check_mem_usage(username, password, cluster, nodename, timeout, critical, warning):
@@ -133,9 +134,9 @@ def check_mem_usage(username, password, cluster, nodename, timeout, critical, wa
         else:
             print "UNKNOWN - RABBITMQ memory usage status"
             sys.ext(1)
-            print 'check_queues_count -- %s'  % results
+            print 'check_mem_usage -- %s'  % results
     except Exception, err:
-        print "Critical - %s" % err
+        print "CRITICAL - Script error. Please debug - %s" % err
         sys.exit(2)
 
 def check_aliveness(username, password, timeout, cluster, virtualhost):
