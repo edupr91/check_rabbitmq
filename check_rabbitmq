@@ -33,7 +33,7 @@ class RabbitCmdWrapper(object):
 
     @classmethod
     def status(cls, username, password, cluster, nodename, timeout):
-        r = requests.get("http://%s:15672/api/nodes/rabbit@%s" % (cluster, nodename), auth=(username, password), timeout=timeout)
+        r = requests.get("http://%s:15672/api/nodes/%s" % (cluster, nodename), auth=(username, password), timeout=timeout)
         results = json.loads("%s" % r.text)
         #args = shlex.split('sudo rabbitmqctl status')
         #cmd_result = subprocess.check_output(args).strip()
@@ -240,8 +240,7 @@ if __name__ == "__main__":
         else:
             warning_value = options.warning
         if options.virtualhost is None:
-            print "virtual host is required (-v|--vhost <vhost>)"
-            exit(1)
+            options.virtualhost = ''
         check_queues_count(options.username, options.password, options.cluster, options.virtualhost, options.timeout, critical_value, warning_value)
     elif options.action == "mem_usage":
         if options.nodename is None:
